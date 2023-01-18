@@ -1,0 +1,73 @@
+version: 2
+
+jobs:
+  "python-3.7": &test-template
+    docker:
+      - image: circleci/python:3.7-browsers
+        environment:
+          REQUIREMENTS_FILE: dev-requirements.txt
+          PYLINTRC37: .pylintrc37
+          TOX: py37,py37-dj{202,301}
+          TOX_PYTHON_37: python
+
+    steps:
+      - checkout
+
+      - run:
+          name: Write deps cache key
+          command: cat "$REQUIREMENTS_FILE" > reqs.txt
+
+      - run:
+          name: Write job name
+          command: echo $CIRCLE_JOB > circlejob.txt
+
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "tox.ini" }}-{{ checksum "reqs.txt" }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "circlejob.txt" }}
+
+      - run:
+          name: Install dependencies
+          command: |
+              sudo pip install --upgrade virtualenv
+              python -m venv venv || virtualenv venv
+              . venv/bin/activate
+              pip install tox
+
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "tox.ini" }}-{{ checksum "reqs.txt" }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "circlejob.txt" }}
+          paths:
+              - "venv"
+              - ".tox"
+
+      - run:
+          name: Run tox
+          command: |
+              . venv/bin/activate
+              tox tox.ini -e $TOX
+
+  "python-3.8":
+    <<: *test-template
+    docker:
+    - image: circleci/python:3.8-browsers
+      environment:
+        REQUIREMENTS_FILE: dev-requirements.txt
+        PYLINTRC37: .pylintrc37
+        TOX: py38,py38-dj{202,301}
+        TOX_PYTHON_38: python
+
+  "python-3.9":
+    <<: *test-template
+    docker:
+    - image: circleci/python:3.9-browsers
+      environment:
+        REQUIREMENTS_FILE: dev-requirements.txt
+        PYLINTRC37: .pylintrc37
+        TOX: py39,py39-dj{202,301}
+        TOX_PYTHON_39: python
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - "python-3.7"
+      - "python-3.8"
+      - "python-3.9"
